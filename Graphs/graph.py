@@ -1,0 +1,410 @@
+import numpy as np
+
+class Queue:
+    '''
+    Implementation of a priority
+    queue for Dijkstra's algorithm
+    The queue is a sorted list of
+    (vertex, distance) pairs, where
+    distance is relative to starting vertex
+    '''
+    
+    def __init__(self, alist):
+        '''
+        Create the list and sort it
+        in ascending order according
+        to the pair's distance
+        '''
+        self.queue = alist
+        self.queue = sorted(alist, key=lambda pair: pair[1])
+        
+    def extractmin(self):
+        '''
+        extract the element with shortes distance
+        from origin vertex
+        '''
+        try:
+            min_element = self.queue.pop(0)
+        except IndexError:
+            self.queue = []
+            min_element = None
+            
+        return min_element
+    
+    def remove(self, vertex):
+        '''
+        remove a vertex regardless of priority
+        '''
+        
+        for count, el in enumerate(self.queue):
+            if el[0] == vertex:
+                del self.queue[count]
+                break
+    
+    def insert(self, pair):
+        '''
+        Insert a new (vertex, distance) pair
+        into the queue, updating the old
+        pair's distance if already present
+        '''
+        
+        self.remove(pair[0])
+        
+        # insert the new pair, sorting it
+        for count, el in enumerate(self.queue):
+            if pair[1] < el[1]:
+                self.queue.insert(count, pair)
+                break
+        else:
+            self.queue.append(pair)
+        
+    def display(self):
+        '''
+        Show the queue
+        '''
+        print(self.queue)
+        
+    def check_empty(self):
+        '''
+        check if the queue is empty
+        '''
+        if self.queue:
+            empty = False
+        else:
+            empty = True
+                
+        return empty
+
+
+class Graph:
+    '''
+    This class models a graph
+    '''
+    
+    def __init__(self, edges, vertices={}, weights=False):
+        '''
+        Initialize the class
+        edges is a dictioary (value, set)
+        vertices is a set of nodes
+        weights is a boolean: True if 
+        the graph is weighted, False otherwise
+        '''
+        
+        self.weights = weights
+        self.edges = edges
+        # also compute the undirected graph
+        # (e.g. if edge (A, B) in graph => (B, A)
+        # in graph too
+        self._undirected()
+        
+        # if vertices is not an empty set
+        # (useful if there are vertices not
+        # connected to anything)
+        if vertices:
+            self.vertices = vertices
+        else:
+            self.vertices = self._vertices(weights=weights)
+                    
+    def _vertices(self, weights=False):
+        '''
+        helper method to find vertices
+        if not provided in instance creation argument
+        '''
+        vertices = set()
+        for vertex1 in self.edges:
+            # add every vertex with outgoing edge
+            vertices.add(vertex1)
+            # add every vertex with ingoing edge
+            for second_vertex in self.edges[vertex1]:
+                if weights:
+                    vertex2 = second_vertex[0]
+                else:
+                    vertex2 = second_vertex
+                vertices.add(vertex2)
+
+        return vertices
+
+    def _undirected(self):
+        '''
+        returns undirected version of graph
+        '''
+        
+        # make a copy of the edge dictionary
+        self.undirected_edges = self.edges.copy()
+        for vertex in self.edges:
+            for vertex2 in self.edges[vertex]:
+                # for every vertex with ingoing edge, create 
+                # an entry if it didn't already existed
+                self.undirected_edges[vertex2] = self.undirected_edges.get(vertex2, set()).copy()
+                # add to that entry the vertex on the other end of the edge
+                self.undirected_edges[vertex2].add(vertex)
+                
+    def shortest_path(self, X, Y):
+        '''
+        apply the Djikstra or BFS algorithm to find
+        shortest path in a (un)weighted graph
+        '''
+        
+        # if with weights, use Dijkstra,
+        # else use BFS
+        if self.weights:
+            distances, predecessors, completed = self.dijkstra(X)
+            try:
+                path = self._track_path(predecessors, X, Y)
+            except:
+                path = None
+        else:
+            distances, predecessors, found = self.BFS(X)
+            try:
+                path = self._track_path(predecessors, X, Y)
+            except:
+                path = None
+            
+        # nicely formatted output
+        if path:
+            result = f"Shortest path is:\n\t{path[0]}"
+            for vertex in path[1:]:
+                result += f" --> {vertex}"
+        else:
+            result = f"{Y} is unreachable from {X}"
+        
+        return result, path
+    
+    def _track_path(self, tree, root, leaf):
+        '''
+        Using a tree generated by
+        BFS, DFS or Dijkstra,
+        determine the path from the root
+        to one of the leaves
+        '''
+        
+        # end point
+        path = [leaf]
+        # until we don't reach starting point
+        # keep adding to the list the predecessors
+        # of current node
+        while leaf != root:
+            leaf = tree[leaf]
+            path.append(leaf)
+            
+        # reverse list so it starts
+        # with root and ends with leave
+        path.reverse()
+        
+        return path
+
+    def BFS(self, start):
+        '''
+        Implement breadth-first search
+        '''
+
+        # initialization
+        d, p, found = self._initialization(start)
+        
+        # iteration
+        queue = {start}
+        # keep going until queue is empty
+        while queue:
+            # extract vertex from queue
+            current = queue.pop()
+            # consider all adjacent nodes of current vertex
+            for neighbor in self.edges.get(current, [None]):
+                # if current node does not have
+                # outgoing edges, ignore this loop
+                if neighbor == None:
+                    continue
+                # if neighbor not already found
+                if neighbor not in found:
+                    found.add(neighbor)
+                    queue.add(neighbor)
+                    d[neighbor] = d[current] + 1
+                    p[neighbor] = current
+
+        return d, p, found
+    
+    def _initialization(self, start):
+        '''
+        helper method
+        to initialize BFS and Dijkstra
+        '''
+        
+        # distances
+        d = {}
+        # predecessors
+        p = {}
+        # found edges
+        completed = set()
+        for V in self.vertices:
+            d[V] = np.inf
+            p[V] = None
+        d[start] = 0
+        p[start] = None
+        completed.add(start)
+        
+        return d, p, completed
+
+    def DFS(self, start):
+        '''
+        Implements depth-first search algorithm
+        '''
+        
+        # initialization
+        d, p, found = self._initialization(start)
+        
+        # iteration
+        d, p, found = self._DFS_visit(start, d, p, found)
+        
+        return d, p, found
+    
+    def _DFS_visit(self, V, d, p, found):
+        found.add(V)
+        for neighbor in self.edges.get(V, [None]):
+            if neighbor == None:
+                continue
+            if neighbor not in found:
+                d[neighbor] = d[V] + 1
+                p[neighbor] = V
+                self._DFS_visit(neighbor, d, p, found)
+        
+        return d, p, found
+    
+    def dijkstra(self, start):
+        '''
+        Implements Dijkstra's algorithm
+        '''
+        
+        # initialization
+        d, p, completed = self._initialization(start)
+        # create the priority queue
+        the_queue = Queue([(start, 0)])
+        
+        # keep going untile queue is empty
+        while not the_queue.check_empty():
+            # extract the node closest to start.
+            # we cannot find a path shorted
+            # than what we already have
+            # unless there are negative weights
+            (V, _) = the_queue.extractmin()
+            completed.add(V)
+            for neighbor, weight in self.edges.get(V, [(None, np.inf)]):
+                # if current vertex has no outgoing edges, skip
+                if neighbor == None:
+                    continue
+                # otherwise check it its neighbors have
+                # a shorter path through current vertex
+                elif d[neighbor] > d[V] + weight:
+                    # if so, update their distances
+                    d[neighbor] = d[V] + weight
+                    p[neighbor] = V
+                    the_queue.insert((neighbor, d[neighbor]))
+                
+        return d, p, completed
+
+    def _bipartite_DFS_visit(self, current, previous, blue, red, found, flag, bipartite):
+        '''
+        Helper method for bipartite_connected_graph.
+        It is a recursive function that implements
+        depth-first search. Each node found by the algorithm
+        is assigned to one of two sets: blue or red.
+        If, during runtime, a same node is assigned to different colors,
+        then the graph is NOT bipartite, otherwise it is. Also,
+        if this algorithm doesn't find every node in its first run,
+        the graph is NOT connected, otherwise it is. Arguments are:
+        - self: a graph object
+        - current: the current node
+        - previous: the previous node
+        - blue: the blue set
+        - red: the red set
+        - found: set of found vertices
+        - flag: a flag that signals if a node is to be assigned to red or blue
+        - bipartite: the bipartite flag
+        '''
+        
+        # use undirected version. Among neighbors we will have
+        # the immediately preceding node that has been colored already.
+        # Therefore we must skip it because it would otherwise be assigned
+        # a different color, thus implying the graph is not bipartite
+        # even when it may be
+        for neighbor in self.undirected_edges.get(current, [None]):
+            # skip if current node has no outgoing edges or if
+            # neighbor is the predecessor
+            if neighbor == None or neighbor == previous:
+                continue
+            # if neighbor has been already found,
+            # check if what color it would be assigned
+            # flag = 0 means it is assigned red,
+            # flag = 1 means it is assigned blue
+            if neighbor in found:
+                if (flag == 0) and (neighbor in blue):
+                    bipartite = 0
+                elif (flag == 1) and (neighbor in red):
+                    bipartite = 0
+                continue
+
+            found.add(neighbor)
+            if flag == 0:
+                red.add(neighbor)
+            else:
+                blue.add(neighbor)
+            
+            # recursive part. Explore each 
+            # neighbor adjacent nodes and do the
+            # same thing. The returned value is a boolean.
+            new_bipartite = self._bipartite_DFS_visit(neighbor, current, blue, red, found, (flag + 1) % 2, bipartite)
+
+            # If in any of the recursions the boolean is false (0),
+            # the product will propagate that result all the
+            # way up to the 0 depth.
+            bipartite *= new_bipartite
+            
+        return bipartite
+
+    
+
+    def bipartite_connected_graph(self):
+        """
+        This function takes a graph, and return 
+        'both' if the graph is connected and bipartite,
+        'bipartite' if the graph is only bipartite,
+        'connected' if the graph is only connected, 
+        and otherwise return False
+        """
+        
+        # initialization
+        connected = 1
+        bipartite = 1
+        
+        blue = set()
+        red = set()
+        found = set()
+        connected_components = 0
+        
+        # keep going until we find every vertex
+        while found != self.vertices:
+            # extract a vertex to start from, among the vertices
+            # not yet found
+            vertex_pool = self.vertices.difference(found)
+            vertex = vertex_pool.pop()
+            blue.add(vertex)
+            found.add(vertex)
+            # 0 is red, 1 is blue
+            flag = 0
+            previous = vertex
+            bipartite *= self._bipartite_DFS_visit(vertex, previous, blue, red, found, flag, bipartite)
+            connected_components += 1
+        
+        if connected_components == 1:
+            connected = True
+        else:
+            connected = False
+            
+        if bipartite and connected:
+            result = "Both"
+        elif bipartite and (not connected):
+            result = "Bipartite"
+        elif (not bipartite) and connected:
+            result = "Connected"
+        else:
+            result = False
+        
+        return result

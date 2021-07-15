@@ -1,0 +1,26 @@
+### TODO list for project directory 'Matrices'
+
+Tasks Completed
+===============
+
+[X] Implement creation of diagonal matrices
+
+[X] Implement creation of identity matrix
+
+
+Tasks Left
+==========
+
+[ ] Implement broadcasting
+
+[ ] Implement LUP factorization
+
+[ ] Implement matrix inversion
+
+[ ] Implement determinant computation
+
+[ ] Implement Strassen algorithm
+
+[ ] Implement eigenvalue and eigenvector computation
+
+[ ] Implement __setitem__ method
